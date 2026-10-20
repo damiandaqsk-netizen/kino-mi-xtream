@@ -8,11 +8,10 @@
 // El servidor, el usuario y la clave se escriben en la pantalla Configurar
 // del plugin dentro de Kino: nunca viajan a nadie, quedan en tu aparato.
 //
-// Fuente opcional: Addon Latam (protocolo de addons/Stremio). Si la persona
-// pega su enlace personal en Configurar, la sección suma una pestaña
-// "Latam" con sus catálogos. Es un camino totalmente separado: el enlace
-// solo se usa contra addonlatam.duckdns.org y las credenciales de Xtream
-// nunca se envían a ese servidor.
+// Versión 1.3.1: limpieza — se retira la integración con Addon Latam de
+// la 1.3.0 (en Kino ese addon viene predefinido y su clave de acceso está
+// sellada dentro de su propio plugin; no hay enlace personal que usar).
+// Sin cambios funcionales respecto de la 1.2.3.
 //
 // API Xtream (XUI / Xtream Codes) que se usa:
 //   player_api.php?...&action=get_live_categories | get_live_streams&category_id=
@@ -191,24 +190,23 @@ export async function home() {
 /* ============ Sección propia "Mi Xtream" (barra lateral / Más secciones) ============ */
 
 export async function section(arg) {
-  // Películas y Series de tu Xtream, y Latam si pegaste tu enlace personal.
-  // (La pestaña de canales dentro de la sección salía vacía en el TV y los
-  // canales ya tienen su pestaña En vivo propia en Kino, desde la 1.0.0.)
+  // Solo Películas y Series: la pestaña de canales dentro de la sección
+  // salía vacía en el TV (Kino descarta los ítems live de estas filas con
+  // los datos de este panel) y los canales ya tienen su pestaña En vivo
+  // propia en Kino, donde funcionan desde la 1.0.0.
   const tabs = [
     { id: "peliculas", label: "Películas" },
     { id: "series", label: "Series" },
   ];
-  if (latamBase()) tabs.push({ id: "latam", label: "Latam" });
   const wanted = arg && arg.tab;
   const chosen = tabs.some((t) => t.id === wanted) ? wanted : "peliculas";
   let rows = [];
   if (chosen === "peliculas") rows = await rowsFor("vod", 3);
-  else if (chosen === "series") rows = await rowsFor("ser", 3);
-  else rows = await latamRows();
+  else rows = await rowsFor("ser", 3);
   return {
     tabs,
     tab: chosen,
-    hero: { title: "Mi Xtream", text: "Tus películas y tus series, en un solo lugar." },
+    hero: { title: "Mi Xtream", text: "Tus películas y tus series, directo de tu servidor Xtream." },
     rows,
   };
 }
@@ -245,15 +243,6 @@ export async function browse(ref, cursor) {
   if (ref.startsWith("live:")) {
     const data = await xtream("get_live_streams&category_id=" + encodeURIComponent(ref.slice(5)));
     return page(Array.isArray(data) ? data : [], liveItem);
-  }
-  if (ref.startsWith("latamcat:")) {
-    const parts = ref.split(":");
-    const catId = decodeURIComponent(parts.slice(2).join(":"));
-    const manifest = await latamManifest();
-    const cat = latamCatalogs(manifest, false).find((c) => c.type === parts[1] && String(c.id) === catId);
-    if (!cat) return { items: [] };
-    const items = await latamCatalogPage(cat, offset, null);
-    return { items, next: latamHasExtra(cat, "skip") && items.length ? String(offset + items.length) : undefined };
   }
   return { items: [] };
 }
@@ -294,31 +283,12 @@ export async function search(query) {
       }
     } catch (e) { /* salta la categoría */ }
   }
-  // Suma los resultados de Addon Latam (si está configurado): sus catálogos
-  // con búsqueda propia. Si Latam falla, la búsqueda de tu Xtream ya está.
-  if (latamBase() && out.length < SEARCH_MAX) {
-    try {
-      const manifest = await latamManifest();
-      const searchable = latamCatalogs(manifest, false).filter((c) => latamHasExtra(c, "search")).slice(0, 4);
-      for (const cat of searchable) {
-        if (out.length >= SEARCH_MAX) break;
-        try {
-          const items = await latamCatalogPage(cat, 0, String((query && query.q) || "").trim());
-          for (const it of items) {
-            out.push(it);
-            if (out.length >= SEARCH_MAX) break;
-          }
-        } catch (e) { /* salta el catálogo */ }
-      }
-    } catch (e) { /* Latam caído no rompe la búsqueda */ }
-  }
   return out;
 }
 
 /* ============ Capítulos de una serie ============ */
 
 export async function episodes(ref) {
-  if (String(ref).startsWith("latam:series:")) return latamEpisodes(ref);
   const seriesId = String(ref).replace(/^s:/, "");
   const data = await xtream("get_series_info&series_id=" + encodeURIComponent(seriesId));
   const info = (data && data.info) || {};
@@ -352,192 +322,12 @@ export async function episodes(ref) {
   return { series, episodes: eps };
 }
 
-/* ============ Addon Latam (opcional; protocolo de addons/Stremio) ============ */
-
-// El enlace personal (con token) tal como lo pega la persona, convertido en
-// base de la API: se acepta con o sin "/manifest.json", con "/configure" y
-// con el esquema stremio://. El token puede ir en la ruta o en la consulta.
-function latamBase() {
-  let link = (kino.config.get("latam") || "").trim();
-  if (!link) return null;
-  link = link.replace(/^stremio:\/\//i, "https://");
-  let query = "";
-  const qi = link.indexOf("?");
-  if (qi >= 0) { query = link.slice(qi + 1); link = link.slice(0, qi); }
-  link = link
-    .replace(/\/manifest\.json$/i, "")
-    .replace(/\/configure\/?$/i, "")
-    .replace(/\/+$/, "");
-  if (!/^https?:\/\/[^/]+/.test(link)) return null;
-  return { base: link, query };
-}
-
-async function latamFetch(path) {
-  const b = latamBase();
-  if (!b) throw kino.error("auth_required", "Pega tu enlace personal de Addon Latam en Configurar");
-  let r;
-  try {
-    r = await kino.fetch(b.base + path + (b.query ? "?" + b.query : ""));
-  } catch (e) {
-    throw kino.error("unavailable", "Addon Latam no contestó");
-  }
-  if (r.status === 401 || r.status === 403) {
-    throw kino.error("auth_required", "Addon Latam rechazó tu enlace personal (revisa que esté completo)");
-  }
-  if (!r.ok) throw kino.error("unavailable", "Addon Latam respondió " + r.status);
-  try {
-    return JSON.parse(r.text());
-  } catch (e) {
-    throw kino.error("unavailable", "Addon Latam no devolvió datos válidos");
-  }
-}
-
-// El manifiesto se guarda una hora: describe los catálogos del addon y no
-// hace falta pedirlo en cada llamada.
-async function latamManifest() {
-  const cached = kino.storage.get("latam-manifest");
-  if (cached) {
-    try { return JSON.parse(cached); } catch (e) { /* se vuelve a pedir */ }
-  }
-  const m = await latamFetch("/manifest.json");
-  try { kino.storage.set("latam-manifest", JSON.stringify(m), { ttlMs: 60 * 60 * 1000 }); } catch (e) { /* sin caché */ }
-  return m;
-}
-
-function latamCatalogs(manifest, forRows) {
-  const cats = manifest && Array.isArray(manifest.catalogs) ? manifest.catalogs : [];
-  return cats.filter((c) => {
-    if (!c || (c.type !== "movie" && c.type !== "series") || !c.id) return false;
-    const extras = Array.isArray(c.extra) ? c.extra : [];
-    // Un catálogo con un "extra" obligatorio (p. ej. solo-buscador) no se
-    // puede listar en una fila; sí sirve para la búsqueda.
-    if (forRows && extras.some((e) => e && e.isRequired)) return false;
-    return true;
-  });
-}
-
-function latamHasExtra(cat, name) {
-  return (Array.isArray(cat.extra) ? cat.extra : []).some((e) => e && e.name === name);
-}
-
-function latamYear(meta) {
-  const rel = String(meta.releaseInfo || meta.year || "");
-  return /^\d{4}/.test(rel) ? rel.slice(0, 4) : undefined;
-}
-
-function latamItem(meta, type) {
-  const kind = type || meta.type || "movie";
-  const rawId = String(meta.id);
-  return {
-    id: "lt" + rawId.replace(/[^A-Za-z0-9._~-]/g, "-"),
-    ref: "latam:" + kind + ":" + encodeURIComponent(rawId),
-    title: meta.name || rawId,
-    kind,
-    poster: img(meta.poster),
-    backdrop: img(meta.background),
-    overview: meta.description ? String(meta.description) : undefined,
-    year: latamYear(meta),
-    rating: ratingOf(meta.imdbRating),
-    genres: Array.isArray(meta.genres) ? meta.genres.slice(0, 5).map((g) => String(g).slice(0, 30)) : undefined,
-  };
-}
-
-async function latamCatalogPage(cat, skip, searchText) {
-  let path = "/catalog/" + encodeURIComponent(cat.type) + "/" + encodeURIComponent(String(cat.id));
-  const extras = [];
-  if (searchText) extras.push("search=" + encodeURIComponent(searchText));
-  if (skip) extras.push("skip=" + skip);
-  if (extras.length) path += "/" + extras.join("&");
-  path += ".json";
-  const data = await latamFetch(path);
-  const metas = data && Array.isArray(data.metas) ? data.metas : [];
-  return metas.map((m) => latamItem(m, cat.type));
-}
-
-async function latamRows() {
-  const manifest = await latamManifest();
-  const rows = [];
-  for (const cat of latamCatalogs(manifest, true).slice(0, 6)) {
-    try {
-      const items = (await latamCatalogPage(cat, 0, null)).slice(0, 12);
-      if (items.length) {
-        rows.push({
-          id: "latamrow-" + cat.type + "-" + String(cat.id).replace(/[^A-Za-z0-9._~-]/g, "-"),
-          title: cat.name || String(cat.id),
-          ref: "latamcat:" + cat.type + ":" + encodeURIComponent(String(cat.id)),
-          items,
-        });
-      }
-    } catch (e) { /* un catálogo caído no tumba la pestaña */ }
-  }
-  return rows;
-}
-
-async function latamEpisodes(ref) {
-  const id = decodeURIComponent(String(ref).slice("latam:series:".length));
-  const data = await latamFetch("/meta/series/" + encodeURIComponent(id) + ".json");
-  const meta = (data && data.meta) || {};
-  const series = {
-    title: meta.name || undefined,
-    poster: img(meta.poster),
-    backdrop: img(meta.background),
-    overview: meta.description ? String(meta.description) : undefined,
-    year: latamYear(meta),
-    rating: ratingOf(meta.imdbRating),
-    genres: Array.isArray(meta.genres) ? meta.genres.slice(0, 5).map((g) => String(g).slice(0, 30)) : undefined,
-  };
-  const eps = (Array.isArray(meta.videos) ? meta.videos : []).map((v) => ({
-    season: parseInt(v.season, 10) || 0,
-    number: parseInt(v.episode, 10) || 0,
-    ref: "latamep:" + encodeURIComponent(String(v.id)),
-    title: v.title || v.name || ("Episodio " + (v.episode || "")),
-    still: img(v.thumbnail),
-    overview: v.overview ? String(v.overview) : undefined,
-    airDate: v.released && /^\d{4}-\d{2}-\d{2}/.test(String(v.released)) ? String(v.released).slice(0, 10) : undefined,
-    runtimeMinutes: undefined,
-  }));
-  eps.sort((a, b) => a.season - b.season || a.number - b.number);
-  return { series, episodes: eps };
-}
-
-async function latamStream(type, id) {
-  const data = await latamFetch("/stream/" + type + "/" + encodeURIComponent(id) + ".json");
-  const streams = data && Array.isArray(data.streams) ? data.streams : [];
-  const playable = streams.filter((s) => s && s.url);
-  if (!playable.length) {
-    throw kino.error("not_found", "Addon Latam no devolvió un enlace reproducible para este título");
-  }
-  const pick = playable[0];
-  const out = { url: String(pick.url) };
-  if (pick.name || pick.title) out.label = String(pick.name || pick.title).slice(0, 48);
-  const req = pick.behaviorHints && pick.behaviorHints.proxyHeaders && pick.behaviorHints.proxyHeaders.request;
-  if (req && typeof req === "object") {
-    const h = {};
-    for (const k of Object.keys(req)) if (typeof req[k] === "string") h[k] = req[k];
-    if (Object.keys(h).length) out.headers = h;
-  }
-  const alts = playable.slice(1, 8).map((s, i) => ({
-    url: String(s.url),
-    label: String(s.name || s.title || ("Servidor " + (i + 2))).slice(0, 48),
-  }));
-  if (alts.length) out.alternatives = alts;
-  return out;
-}
-
 /* ================= Reproducción ================= */
 
 // El enlace se busca aquí, al reproducir: nunca se guarda ni se precarga.
 export async function resolve(ref) {
-  const r = String(ref);
-  // Primero Addon Latam: esos refs no necesitan tu cuenta Xtream para nada.
-  if (r.startsWith("latamep:")) {
-    return latamStream("series", decodeURIComponent(r.slice("latamep:".length)));
-  }
-  if (r.startsWith("latam:")) {
-    const parts = r.split(":");
-    return latamStream(parts[1] === "series" ? "series" : "movie", decodeURIComponent(parts.slice(2).join(":")));
-  }
   const { s, u, p } = baseUrl();
+  const r = String(ref);
   const eu = encodeURIComponent(u), ep = encodeURIComponent(p);
   if (r.startsWith("m:")) {
     const [, id, ext] = r.split(":");

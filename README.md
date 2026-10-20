@@ -4,7 +4,7 @@ Tu TV en vivo, tus **películas** y tus **series** de tu servidor Xtream dentro 
 los canales en la pestaña **En vivo**, y el catálogo en el Inicio, las categorías y la
 búsqueda de la app, con los capítulos de cada serie ordenados por temporada.
 
-**Versión 1.3.0** — integración opcional de Addon Latam: si pegas tu enlace personal en Configurar (campo nuevo, tipo contraseña), la sección suma la pestaña "Latam" con sus catálogos de películas y series, sus capítulos y sus streams (con servidores alternativos), y la búsqueda mezcla ambas fuentes. Tu Xtream y Latam van por caminos separados: tus credenciales nunca se envían al servidor de Latam. La 1.2.3 — a pedido de Damian, la sección queda solo con Películas y Series (fuera la pestaña En vivo de la sección, que salía vacía; los canales siguen en la pestaña En vivo de Kino). La 1.2.2 — la pestaña En vivo de la sección salía vacía en el TV (Películas y Series sí cargaban): los logos de canales Xtream suelen venir con espacios sin codificar y una imagen inválida hace que Kino descarte el ítem en silencio; ahora toda URL de imagen se sanea con encodeURI y el ref de los canales en filas usa el formato oficial "live:<id>". La 1.2.1 dejó la sección liviana y en paralelo (la 1.2.0 pedía hasta 10 categorías en fila y no entraba en los 20 s de la sección). La 1.2.0 sumó la **sección propia "Mi Xtream"** (entrada en la barra lateral /
+**Versión 1.2.3** — a pedido de Damian, la sección queda solo con Películas y Series (fuera la pestaña En vivo de la sección, que salía vacía; los canales siguen en la pestaña En vivo de Kino). La 1.2.2 — la pestaña En vivo de la sección salía vacía en el TV (Películas y Series sí cargaban): los logos de canales Xtream suelen venir con espacios sin codificar y una imagen inválida hace que Kino descarte el ítem en silencio; ahora toda URL de imagen se sanea con encodeURI y el ref de los canales en filas usa el formato oficial "live:<id>". La 1.2.1 dejó la sección liviana y en paralelo (la 1.2.0 pedía hasta 10 categorías en fila y no entraba en los 20 s de la sección). La 1.2.0 sumó la **sección propia "Mi Xtream"** (entrada en la barra lateral /
 "Más secciones" del TV, con pestañas Películas · Series · En vivo) y mosaicos en la
 pestaña **Categorías** de Kino. La 1.1.0 agregó películas (VOD) y series con capítulos
 a la 1.0.0 (solo TV en vivo).
@@ -17,6 +17,12 @@ primero **las categorías** (una respuesta pequeña) y luego el contenido **por 
 y por páginas** (canales de 200 en 200; películas y series de 60 en 60; los capítulos,
 al abrir cada serie). Ninguna petición es grande: todo entra en los límites de Kino
 (15–30 s por petición, 5 MB máximo).
+
+## Versión 1.3.1 — limpieza
+
+Se retira la integración con Addon Latam agregada en la 1.3.0. En Kino, Addon Latam viene predefinido y su clave de acceso está sellada dentro de su propio plugin, así que no existe ningún enlace personal que configurar y ningún otro plugin puede usar esa clave. Latam sigue disponible en Kino como su propia sección.
+
+Sin cambios funcionales respecto de la 1.2.3: sección con Películas y Series, canales en vivo por categorías en la pestaña En vivo de Kino, buscador y capítulos.
 
 ## Archivos
 
