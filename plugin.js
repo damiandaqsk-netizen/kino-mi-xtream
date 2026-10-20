@@ -139,40 +139,31 @@ function liveItem(s) {
 }
 
 // Filas por categoría (muestra de 12) para Inicio y para la sección propia.
+// Pocas categorías y pedidas EN PARALELO: la sección de Kino da 20 s por
+// llamada, y con un catálogo real (miles de títulos) pedir muchas categorías
+// en fila no entra en ese tiempo en un TV y la pestaña sale vacía. El resto
+// del catálogo queda a un toque: "Ver más", Categorías y la búsqueda.
 async function rowsFor(kind, limitCats) {
-  const rows = [];
-  if (kind === "vod") {
-    for (const c of (await categoriesOf("get_vod_categories")).slice(0, limitCats)) {
-      try {
-        const data = await xtream("get_vod_streams&category_id=" + encodeURIComponent(c.id));
-        const items = (Array.isArray(data) ? data : []).slice(0, 12).map(movieItem);
-        if (items.length) rows.push({ id: "vodrow-" + c.id, title: "Películas · " + c.title, ref: "vod:" + c.id, genre: "peliculas", items });
-      } catch (e) { /* una categoría caída no tumba la pantalla */ }
-    }
-  } else if (kind === "ser") {
-    for (const c of (await categoriesOf("get_series_categories")).slice(0, limitCats)) {
-      try {
-        const data = await xtream("get_series&category_id=" + encodeURIComponent(c.id));
-        const items = (Array.isArray(data) ? data : []).slice(0, 12).map(seriesItem);
-        if (items.length) rows.push({ id: "serrow-" + c.id, title: "Series · " + c.title, ref: "ser:" + c.id, genre: "series", items });
-      } catch (e) { /* igual */ }
-    }
-  } else if (kind === "live") {
-    for (const c of (await categoriesOf("get_live_categories")).slice(0, limitCats)) {
-      try {
-        const data = await xtream("get_live_streams&category_id=" + encodeURIComponent(c.id));
-        const items = (Array.isArray(data) ? data : []).slice(0, 12).map(liveItem);
-        if (items.length) rows.push({ id: "liverow-" + c.id, title: "En vivo · " + c.title, ref: "live:" + c.id, items });
-      } catch (e) { /* igual */ }
-    }
-  }
-  return rows;
+  const conf = {
+    vod:  { cats: "get_vod_categories",    streams: "get_vod_streams",  map: movieItem,  row: (c, items) => ({ id: "vodrow-" + c.id, title: "Películas · " + c.title, ref: "vod:" + c.id, genre: "peliculas", items }) },
+    ser:  { cats: "get_series_categories", streams: "get_series",       map: seriesItem, row: (c, items) => ({ id: "serrow-" + c.id, title: "Series · " + c.title, ref: "ser:" + c.id, genre: "series", items }) },
+    live: { cats: "get_live_categories",   streams: "get_live_streams", map: liveItem,   row: (c, items) => ({ id: "liverow-" + c.id, title: "En vivo · " + c.title, ref: "live:" + c.id, items }) },
+  }[kind];
+  const cats = (await categoriesOf(conf.cats)).slice(0, limitCats);
+  const built = await Promise.all(cats.map(async (c) => {
+    try {
+      const data = await xtream(conf.streams + "&category_id=" + encodeURIComponent(c.id));
+      const items = (Array.isArray(data) ? data : []).slice(0, 12).map(conf.map);
+      return items.length ? conf.row(c, items) : null;
+    } catch (e) { return null; /* una categoría caída no tumba la pantalla */ }
+  }));
+  return built.filter(Boolean);
 }
 
 export async function home() {
   const rows = [];
-  rows.push(...await rowsFor("vod", 6));
-  rows.push(...await rowsFor("ser", 6));
+  rows.push(...await rowsFor("vod", 3));
+  rows.push(...await rowsFor("ser", 3));
   return rows;
 }
 
@@ -187,9 +178,9 @@ export async function section(arg) {
   const wanted = arg && arg.tab;
   const chosen = tabs.some((t) => t.id === wanted) ? wanted : "peliculas";
   let rows = [];
-  if (chosen === "peliculas") rows = await rowsFor("vod", 10);
-  else if (chosen === "series") rows = await rowsFor("ser", 10);
-  else rows = await rowsFor("live", 10);
+  if (chosen === "peliculas") rows = await rowsFor("vod", 3);
+  else if (chosen === "series") rows = await rowsFor("ser", 3);
+  else rows = await rowsFor("live", 3);
   return {
     tabs,
     tab: chosen,

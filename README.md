@@ -4,7 +4,7 @@ Tu TV en vivo, tus **películas** y tus **series** de tu servidor Xtream dentro 
 los canales en la pestaña **En vivo**, y el catálogo en el Inicio, las categorías y la
 búsqueda de la app, con los capítulos de cada serie ordenados por temporada.
 
-**Versión 1.2.0** — suma la **sección propia "Mi Xtream"** (entrada en la barra lateral /
+**Versión 1.2.1** — corrección de carga de la sección: pocas categorías por pestaña y pedidas en paralelo (la 1.2.0 pedía hasta 10 en fila y en un TV con un catálogo grande la pestaña salía vacía por el límite de 20 s de la sección). La 1.2.0 sumó la **sección propia "Mi Xtream"** (entrada en la barra lateral /
 "Más secciones" del TV, con pestañas Películas · Series · En vivo) y mosaicos en la
 pestaña **Categorías** de Kino. La 1.1.0 agregó películas (VOD) y series con capítulos
 a la 1.0.0 (solo TV en vivo).
