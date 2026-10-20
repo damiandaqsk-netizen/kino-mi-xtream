@@ -27,7 +27,12 @@ function baseUrl() {
 async function xtream(action) {
   const { s, u, p } = baseUrl();
   const url = `${s}/player_api.php?username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}&action=${action}`;
-  const r = await kino.fetch(url);
+  let r;
+  try {
+    r = await kino.fetch(url);
+  } catch (e) {
+    throw kino.error("unavailable", "No se pudo contactar el servidor Xtream");
+  }
   // XUI responde 200 con el JSON también cuando la clave está mal ("user_info": { "auth": 0 });
   // los paneles Xtream-Masters además devuelven 401 con INVALID_AUTH para credenciales inválidas.
   if (r.status === 401) {
