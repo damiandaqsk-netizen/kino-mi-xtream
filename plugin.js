@@ -2,9 +2,9 @@
 
 // Mi Xtream — plugin de Kino.
 // TV en vivo (capacidad "channels") + películas y series (catálogo) desde
-// TU servidor Xtream. Todo se pide por categorías y paginado, nunca la
-// lista entera de una vez (ese es el paso que Kino corta por tamaño/tiempo
-// en la sección nativa "Mis canales").
+// TU servidor Xtream, con su propia sección en Kino. Todo se pide por
+// categorías y paginado, nunca la lista entera de una vez (ese es el paso
+// que Kino corta por tamaño/tiempo en la sección nativa "Mis canales").
 // El servidor, el usuario y la clave se escriben en la pantalla Configurar
 // del plugin dentro de Kino: nunca viajan a nadie, quedan en tu aparato.
 //
@@ -15,8 +15,8 @@
 //   player_api.php?...&action=get_series_info&series_id=
 // Reproducción: /live/U/P/<id>.m3u8 · /movie/U/P/<id>.<ext> · /series/U/P/<id>.<ext>
 
-const LIVE_PAGE = 200;   // canales por página dentro de una categoría
-const BROWSE_PAGE = 60;  // títulos por página en películas/series
+const LIVE_PAGE = 200;   // canales por página dentro de una categoría (En vivo)
+const BROWSE_PAGE = 60;  // títulos por página al explorar
 const SEARCH_MAX = 60;   // resultados máximos de una búsqueda
 const SEARCH_MAX_FETCHES = 30;
 
@@ -71,14 +71,18 @@ function ratingOf(v) {
   return isNaN(n) || n <= 0 ? undefined : Math.round(n * 10) / 10;
 }
 
-/* ================= TV en vivo (pestaña En vivo) ================= */
-
-export async function liveCategories() {
-  const data = await xtream("get_live_categories");
+async function categoriesOf(action) {
+  const data = await xtream(action);
   if (!Array.isArray(data)) return [];
   return data
     .filter((c) => c && c.category_id)
     .map((c) => ({ id: String(c.category_id), title: c.category_name || String(c.category_id) }));
+}
+
+/* ================= TV en vivo (pestaña En vivo de Kino) ================= */
+
+export async function liveCategories() {
+  return categoriesOf("get_live_categories");
 }
 
 export async function liveChannels({ categoryId, cursor }) {
@@ -95,7 +99,7 @@ export async function liveChannels({ categoryId, cursor }) {
   return { items, next: offset + LIVE_PAGE < all.length ? String(offset + LIVE_PAGE) : undefined };
 }
 
-/* ================= Películas y series (catálogo) ================= */
+/* ================= Catálogo: películas y series ================= */
 
 function movieItem(s) {
   const ext = s.container_extension || "mp4";
@@ -124,58 +128,113 @@ function seriesItem(s) {
   };
 }
 
-async function categoriesOf(action) {
-  const data = await xtream(action);
-  if (!Array.isArray(data)) return [];
-  return data
-    .filter((c) => c && c.category_id)
-    .map((c) => ({ id: String(c.category_id), title: c.category_name || String(c.category_id) }));
+function liveItem(s) {
+  return {
+    id: "ch" + s.stream_id,
+    ref: String(s.stream_id),
+    title: s.name || ("Canal " + s.stream_id),
+    kind: "live",
+    poster: s.stream_icon ? String(s.stream_icon) : undefined,
+  };
 }
 
-// Filas de Inicio: hasta 6 categorías de películas y 6 de series, con una
-// muestra de títulos cada una. El resto se explora con "Ver más" (browse)
-// o con la búsqueda.
-export async function home() {
+// Filas por categoría (muestra de 12) para Inicio y para la sección propia.
+async function rowsFor(kind, limitCats) {
   const rows = [];
-  const vodCats = await categoriesOf("get_vod_categories");
-  for (const c of vodCats.slice(0, 6)) {
-    try {
-      const data = await xtream("get_vod_streams&category_id=" + encodeURIComponent(c.id));
-      const items = (Array.isArray(data) ? data : []).slice(0, 12).map(movieItem);
-      if (items.length) rows.push({ id: "vodrow-" + c.id, title: "Películas · " + c.title, ref: "vod:" + c.id, genre: "peliculas", items });
-    } catch (e) { /* una categoría caída no tumba el Inicio */ }
-  }
-  const serCats = await categoriesOf("get_series_categories");
-  for (const c of serCats.slice(0, 6)) {
-    try {
-      const data = await xtream("get_series&category_id=" + encodeURIComponent(c.id));
-      const items = (Array.isArray(data) ? data : []).slice(0, 12).map(seriesItem);
-      if (items.length) rows.push({ id: "serrow-" + c.id, title: "Series · " + c.title, ref: "ser:" + c.id, genre: "series", items });
-    } catch (e) { /* igual */ }
+  if (kind === "vod") {
+    for (const c of (await categoriesOf("get_vod_categories")).slice(0, limitCats)) {
+      try {
+        const data = await xtream("get_vod_streams&category_id=" + encodeURIComponent(c.id));
+        const items = (Array.isArray(data) ? data : []).slice(0, 12).map(movieItem);
+        if (items.length) rows.push({ id: "vodrow-" + c.id, title: "Películas · " + c.title, ref: "vod:" + c.id, genre: "peliculas", items });
+      } catch (e) { /* una categoría caída no tumba la pantalla */ }
+    }
+  } else if (kind === "ser") {
+    for (const c of (await categoriesOf("get_series_categories")).slice(0, limitCats)) {
+      try {
+        const data = await xtream("get_series&category_id=" + encodeURIComponent(c.id));
+        const items = (Array.isArray(data) ? data : []).slice(0, 12).map(seriesItem);
+        if (items.length) rows.push({ id: "serrow-" + c.id, title: "Series · " + c.title, ref: "ser:" + c.id, genre: "series", items });
+      } catch (e) { /* igual */ }
+    }
+  } else if (kind === "live") {
+    for (const c of (await categoriesOf("get_live_categories")).slice(0, limitCats)) {
+      try {
+        const data = await xtream("get_live_streams&category_id=" + encodeURIComponent(c.id));
+        const items = (Array.isArray(data) ? data : []).slice(0, 12).map(liveItem);
+        if (items.length) rows.push({ id: "liverow-" + c.id, title: "En vivo · " + c.title, ref: "live:" + c.id, items });
+      } catch (e) { /* igual */ }
+    }
   }
   return rows;
 }
 
+export async function home() {
+  const rows = [];
+  rows.push(...await rowsFor("vod", 6));
+  rows.push(...await rowsFor("ser", 6));
+  return rows;
+}
+
+/* ============ Sección propia "Mi Xtream" (barra lateral / Más secciones) ============ */
+
+export async function section(arg) {
+  const tabs = [
+    { id: "peliculas", label: "Películas" },
+    { id: "series", label: "Series" },
+    { id: "envivo", label: "En vivo" },
+  ];
+  const wanted = arg && arg.tab;
+  const chosen = tabs.some((t) => t.id === wanted) ? wanted : "peliculas";
+  let rows = [];
+  if (chosen === "peliculas") rows = await rowsFor("vod", 10);
+  else if (chosen === "series") rows = await rowsFor("ser", 10);
+  else rows = await rowsFor("live", 10);
+  return {
+    tabs,
+    tab: chosen,
+    hero: { title: "Mi Xtream", text: "Tu TV en vivo, tus películas y tus series, directo de tu servidor Xtream." },
+    rows,
+  };
+}
+
+/* ============ Mosaicos en la pestaña Categorías de Kino ============ */
+
+export async function categories() {
+  const tiles = [];
+  const push = (prefix, ref, name, id) => {
+    tiles.push({ id, title: (prefix + name).slice(0, 40), ref });
+  };
+  for (const c of await categoriesOf("get_vod_categories")) push("Películas · ", "vod:" + c.id, c.title, "tile-vod-" + c.id);
+  for (const c of await categoriesOf("get_series_categories")) push("Series · ", "ser:" + c.id, c.title, "tile-ser-" + c.id);
+  for (const c of await categoriesOf("get_live_categories")) push("TV · ", "live:" + c.id, c.title, "tile-live-" + c.id);
+  return tiles.slice(0, 24);
+}
+
+/* ============ Explorar ("Ver más") ============ */
+
 export async function browse(ref, cursor) {
   const offset = cursor ? parseInt(cursor, 10) || 0 : 0;
+  const page = (all, map) => ({
+    items: all.slice(offset, offset + BROWSE_PAGE).map(map),
+    next: offset + BROWSE_PAGE < all.length ? String(offset + BROWSE_PAGE) : undefined,
+  });
   if (ref.startsWith("vod:")) {
     const data = await xtream("get_vod_streams&category_id=" + encodeURIComponent(ref.slice(4)));
-    const all = Array.isArray(data) ? data : [];
-    return {
-      items: all.slice(offset, offset + BROWSE_PAGE).map(movieItem),
-      next: offset + BROWSE_PAGE < all.length ? String(offset + BROWSE_PAGE) : undefined,
-    };
+    return page(Array.isArray(data) ? data : [], movieItem);
   }
   if (ref.startsWith("ser:")) {
     const data = await xtream("get_series&category_id=" + encodeURIComponent(ref.slice(4)));
-    const all = Array.isArray(data) ? data : [];
-    return {
-      items: all.slice(offset, offset + BROWSE_PAGE).map(seriesItem),
-      next: offset + BROWSE_PAGE < all.length ? String(offset + BROWSE_PAGE) : undefined,
-    };
+    return page(Array.isArray(data) ? data : [], seriesItem);
+  }
+  if (ref.startsWith("live:")) {
+    const data = await xtream("get_live_streams&category_id=" + encodeURIComponent(ref.slice(5)));
+    return page(Array.isArray(data) ? data : [], liveItem);
   }
   return { items: [] };
 }
+
+/* ============ Búsqueda ============ */
 
 export async function search(query) {
   const q = ((query && query.q) || "").trim().toLowerCase();
@@ -189,8 +248,7 @@ export async function search(query) {
   };
   const out = [];
   let fetches = 0;
-  const vodCats = await categoriesOf("get_vod_categories");
-  for (const c of vodCats) {
+  for (const c of await categoriesOf("get_vod_categories")) {
     if (out.length >= SEARCH_MAX || fetches >= SEARCH_MAX_FETCHES) break;
     fetches++;
     try {
@@ -201,8 +259,7 @@ export async function search(query) {
       }
     } catch (e) { /* salta la categoría */ }
   }
-  const serCats = await categoriesOf("get_series_categories");
-  for (const c of serCats) {
+  for (const c of await categoriesOf("get_series_categories")) {
     if (out.length >= SEARCH_MAX || fetches >= SEARCH_MAX_FETCHES) break;
     fetches++;
     try {
@@ -215,6 +272,8 @@ export async function search(query) {
   }
   return out;
 }
+
+/* ============ Capítulos de una serie ============ */
 
 export async function episodes(ref) {
   const seriesId = String(ref).replace(/^s:/, "");

@@ -4,7 +4,10 @@ Tu TV en vivo, tus **películas** y tus **series** de tu servidor Xtream dentro 
 los canales en la pestaña **En vivo**, y el catálogo en el Inicio, las categorías y la
 búsqueda de la app, con los capítulos de cada serie ordenados por temporada.
 
-**Versión 1.1.0** — agrega películas (VOD) y series con capítulos a la 1.0.0 (solo TV en vivo).
+**Versión 1.2.0** — suma la **sección propia "Mi Xtream"** (entrada en la barra lateral /
+"Más secciones" del TV, con pestañas Películas · Series · En vivo) y mosaicos en la
+pestaña **Categorías** de Kino. La 1.1.0 agregó películas (VOD) y series con capítulos
+a la 1.0.0 (solo TV en vivo).
 
 ## Por qué este plugin existe
 
@@ -17,7 +20,7 @@ al abrir cada serie). Ninguna petición es grande: todo entra en los límites de
 
 ## Archivos
 
-- `kino-plugin.json` — el manifiesto (id `mi-xtream`, versión `1.1.0`, apiVersion 4).
+- `kino-plugin.json` — el manifiesto (id `mi-xtream`, versión `1.2.0`, apiVersion 6).
 - `plugin.js` — el código.
 
 Tu **contraseña no va en estos archivos**: se escribe en el TV, en la pantalla
