@@ -71,6 +71,19 @@ function ratingOf(v) {
   return isNaN(n) || n <= 0 ? undefined : Math.round(n * 10) / 10;
 }
 
+// Los logos de canales de los paneles Xtream suelen venir con espacios y
+// caracteres sin codificar ("ESPN HD.png"): una URL de imagen inválida hace
+// que Kino descarte el ítem entero en silencio. encodeURI la deja válida
+// sin tocar las que ya vienen bien (TMDB, etc.).
+function img(url) {
+  if (!url) return undefined;
+  try {
+    return encodeURI(String(url).trim());
+  } catch (e) {
+    return undefined;
+  }
+}
+
 async function categoriesOf(action) {
   const data = await xtream(action);
   if (!Array.isArray(data)) return [];
@@ -94,7 +107,7 @@ export async function liveChannels({ categoryId, cursor }) {
     title: s.name || ("Canal " + s.stream_id),
     categoryId: String(categoryId),
     ref: String(s.stream_id),
-    logo: s.stream_icon ? String(s.stream_icon) : undefined,
+    logo: img(s.stream_icon),
   }));
   return { items, next: offset + LIVE_PAGE < all.length ? String(offset + LIVE_PAGE) : undefined };
 }
@@ -108,7 +121,7 @@ function movieItem(s) {
     ref: "m:" + s.stream_id + ":" + ext,
     title: s.name || ("Película " + s.stream_id),
     kind: "movie",
-    poster: s.stream_icon ? String(s.stream_icon) : undefined,
+    poster: img(s.stream_icon),
     year: yearOf(s.releaseDate || s.releasedate, s.added),
     rating: ratingOf(s.rating),
   };
@@ -120,7 +133,7 @@ function seriesItem(s) {
     ref: "s:" + s.series_id,
     title: s.name || ("Serie " + s.series_id),
     kind: "series",
-    poster: s.cover ? String(s.cover) : undefined,
+    poster: img(s.cover),
     overview: s.plot ? String(s.plot) : undefined,
     year: yearOf(s.releaseDate || s.release_date, s.last_modified),
     rating: ratingOf(s.rating),
@@ -131,10 +144,12 @@ function seriesItem(s) {
 function liveItem(s) {
   return {
     id: "ch" + s.stream_id,
-    ref: String(s.stream_id),
+    // El ref de un ítem live en filas/búsqueda lleva el prefijo "live:",
+    // como en el ejemplo oficial de Kino; resolve() lo quita al reproducir.
+    ref: "live:" + s.stream_id,
     title: s.name || ("Canal " + s.stream_id),
     kind: "live",
-    poster: s.stream_icon ? String(s.stream_icon) : undefined,
+    poster: img(s.stream_icon),
   };
 }
 
@@ -272,7 +287,7 @@ export async function episodes(ref) {
   const info = (data && data.info) || {};
   const series = {
     title: info.name || undefined,
-    poster: info.cover ? String(info.cover) : undefined,
+    poster: img(info.cover),
     overview: info.plot ? String(info.plot) : undefined,
     year: yearOf(info.releaseDate || info.release_date, null),
     rating: ratingOf(info.rating),
@@ -289,7 +304,7 @@ export async function episodes(ref) {
         number: parseInt(ep.episode_num, 10) || 0,
         ref: "e:" + ep.id + ":" + ext,
         title: ep.title || ("Episodio " + (ep.episode_num || "")),
-        still: ep.info && ep.info.movie_image ? String(ep.info.movie_image) : undefined,
+        still: ep.info ? img(ep.info.movie_image) : undefined,
         overview: ep.info && ep.info.plot ? String(ep.info.plot) : undefined,
         airDate: ep.info && ep.info.release_date ? String(ep.info.release_date) : undefined,
         runtimeMinutes: dur,
@@ -315,7 +330,7 @@ export async function resolve(ref) {
     const [, id, ext] = r.split(":");
     return { url: `${s}/series/${eu}/${ep}/${encodeURIComponent(id)}.${ext || "mp4"}` };
   }
-  const id = r.replace(/^ch/, "");
+  const id = r.replace(/^live:/, "").replace(/^ch/, "");
   return {
     url: `${s}/live/${eu}/${ep}/${encodeURIComponent(id)}.m3u8`,
     mime: "application/vnd.apple.mpegurl",
