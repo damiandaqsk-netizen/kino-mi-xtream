@@ -1,18 +1,23 @@
 # Mi Xtream — plugin de Kino
 
-Tus canales en vivo de tu servidor Xtream dentro de la pestaña **En vivo** de Kino.
+Tu TV en vivo, tus **películas** y tus **series** de tu servidor Xtream dentro de Kino:
+los canales en la pestaña **En vivo**, y el catálogo en el Inicio, las categorías y la
+búsqueda de la app, con los capítulos de cada serie ordenados por temporada.
+
+**Versión 1.1.0** — agrega películas (VOD) y series con capítulos a la 1.0.0 (solo TV en vivo).
 
 ## Por qué este plugin existe
 
 La sección nativa "Mis canales" de Kino baja la lista completa de una vez y la corta
 por tiempo/tamaño ("tu servidor no está disponible"). Este plugin, en cambio, pide
-primero **las categorías** (una respuesta pequeña) y luego los canales **de la categoría
-que abras, por páginas de 200**. Ninguna petición es grande: todo entra en los límites
-de Kino (15–30 s por petición, 5 MB máximo).
+primero **las categorías** (una respuesta pequeña) y luego el contenido **por categoría
+y por páginas** (canales de 200 en 200; películas y series de 60 en 60; los capítulos,
+al abrir cada serie). Ninguna petición es grande: todo entra en los límites de Kino
+(15–30 s por petición, 5 MB máximo).
 
 ## Archivos
 
-- `kino-plugin.json` — el manifiesto (id `mi-xtream`, versión `1.0.0`, apiVersion 3).
+- `kino-plugin.json` — el manifiesto (id `mi-xtream`, versión `1.1.0`, apiVersion 4).
 - `plugin.js` — el código.
 
 Tu **contraseña no va en estos archivos**: se escribe en el TV, en la pantalla
@@ -48,5 +53,8 @@ Kino 0.9.51 o más nuevo (usa apiVersion 3).
 
 ## Nota técnica
 
-Reproduce por HLS: `/live/<usuario>/<clave>/<id>.m3u8`. Si algún canal no abre con
-esa forma, avísame y ajusto la URL de reproducción.
+Reproduce cada cosa por su ruta Xtream: TV en vivo por HLS
+(`/live/<usuario>/<clave>/<id>.m3u8`), películas por `/movie/<usuario>/<clave>/<id>.<ext>`
+y capítulos por `/series/<usuario>/<clave>/<id>.<ext>`, usando la extensión
+(contenedor) que reporta el propio servidor. Si algo no abre con esa forma, avísame
+y ajusto la URL de reproducción.
