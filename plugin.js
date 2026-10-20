@@ -185,21 +185,23 @@ export async function home() {
 /* ============ Sección propia "Mi Xtream" (barra lateral / Más secciones) ============ */
 
 export async function section(arg) {
+  // Solo Películas y Series: la pestaña de canales dentro de la sección
+  // salía vacía en el TV (Kino descarta los ítems live de estas filas con
+  // los datos de este panel) y los canales ya tienen su pestaña En vivo
+  // propia en Kino, donde funcionan desde la 1.0.0.
   const tabs = [
     { id: "peliculas", label: "Películas" },
     { id: "series", label: "Series" },
-    { id: "envivo", label: "En vivo" },
   ];
   const wanted = arg && arg.tab;
   const chosen = tabs.some((t) => t.id === wanted) ? wanted : "peliculas";
   let rows = [];
   if (chosen === "peliculas") rows = await rowsFor("vod", 3);
-  else if (chosen === "series") rows = await rowsFor("ser", 3);
-  else rows = await rowsFor("live", 3);
+  else rows = await rowsFor("ser", 3);
   return {
     tabs,
     tab: chosen,
-    hero: { title: "Mi Xtream", text: "Tu TV en vivo, tus películas y tus series, directo de tu servidor Xtream." },
+    hero: { title: "Mi Xtream", text: "Tus películas y tus series, directo de tu servidor Xtream." },
     rows,
   };
 }
