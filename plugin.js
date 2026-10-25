@@ -26,11 +26,11 @@ const SEARCH_MAX = 60;   // resultados máximos de una búsqueda
 const SEARCH_MAX_FETCHES = 30;
 
 function baseUrl() {
-  const s = "http://tvgopremium.net:80"; // servidor fijo desde la 1.3.2 (con puerto :80 desde la 1.3.3): ya no se escribe en Configurar
+  const s = (kino.config.get("servidor") || "").trim().replace(/\/+$/, "");
   const u = (kino.config.get("usuario") || "").trim();
   const p = (kino.config.get("clave") || "").trim();
-  if (!u || !p) {
-    throw kino.error("auth_required", "Configura tu usuario y contraseña en Ajustes ▸ Plugins ▸ Mi Xtream ▸ Configurar");
+  if (!s || !u || !p) {
+    throw kino.error("auth_required", "Configura tu servidor, usuario y contraseña en Ajustes ▸ Plugins ▸ Mi Xtream ▸ Configurar");
   }
   return { s, u, p };
 }
