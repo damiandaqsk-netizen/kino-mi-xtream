@@ -18,6 +18,10 @@ y por páginas** (canales de 200 en 200; películas y series de 60 en 60; los ca
 al abrir cada serie). Ninguna petición es grande: todo entra en los límites de Kino
 (15–30 s por petición, 5 MB máximo).
 
+## Versión 1.3.2 — servidor fijo
+
+El servidor Xtream (http://tvgopremium.net) queda fijo dentro del plugin: en Configurar ya solo se escriben **usuario y contraseña**. El manifiesto declara `hosts: ["tvgopremium.net"]` (requisito del validador al ya no existir un ajuste tipo url). Si el proveedor cambia de dominio, hay que actualizar el plugin.
+
 ## Versión 1.3.1 — limpieza
 
 Se retira la integración con Addon Latam agregada en la 1.3.0. En Kino, Addon Latam viene predefinido y su clave de acceso está sellada dentro de su propio plugin, así que no existe ningún enlace personal que configurar y ningún otro plugin puede usar esa clave. Latam sigue disponible en Kino como su propia sección.
