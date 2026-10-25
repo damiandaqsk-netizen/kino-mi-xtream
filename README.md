@@ -18,9 +18,13 @@ y por páginas** (canales de 200 en 200; películas y series de 60 en 60; los ca
 al abrir cada serie). Ninguna petición es grande: todo entra en los límites de Kino
 (15–30 s por petición, 5 MB máximo).
 
+## Versión 1.3.3 — dirección con puerto
+
+La dirección fija del servidor queda exactamente `http://tvgopremium.net:80` (con el puerto 80, sin espacios), como lo pide Damian.
+
 ## Versión 1.3.2 — servidor fijo
 
-El servidor Xtream (http://tvgopremium.net) queda fijo dentro del plugin: en Configurar ya solo se escriben **usuario y contraseña**. El manifiesto declara `hosts: ["tvgopremium.net"]` (requisito del validador al ya no existir un ajuste tipo url). Si el proveedor cambia de dominio, hay que actualizar el plugin.
+El servidor Xtream (http://tvgopremium.net:80) queda fijo dentro del plugin: en Configurar ya solo se escriben **usuario y contraseña**. El manifiesto declara `hosts: ["tvgopremium.net"]` (requisito del validador al ya no existir un ajuste tipo url). Si el proveedor cambia de dominio, hay que actualizar el plugin.
 
 ## Versión 1.3.1 — limpieza
 
